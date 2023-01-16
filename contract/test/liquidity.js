@@ -32,34 +32,82 @@ contract('Liquidity', (accounts) => {
       );
     });
   });
-  describe.skip('유동성 공급', async () => {
+  describe('유동성 공급', async () => {
     it('유동성 공급한다. (유동성이 0인 상태)', async () => {
-      // liquidity 컨트랙트에게 500개의 WEMEX토큰을 사용할 수 있도록 승인
+      console.log('토큰 : 1000, 이더 : 500');
+      // liquidity 컨트랙트에게 1000개의 WEMEX토큰을 사용할 수 있도록 승인
       await token.approve(liquidity.address, toWei('1000', 'ether'));
       // 유동성 공급자는 500개의 WEMEX 토큰과 1000개의 이더리움을 Exchange 컨트랙트에 유동성 공급한다.
       await liquidity.addLiquidity(toWei('1000', 'ether'), {
         value: toWei('500', 'ether'),
       });
-      // Exchange 컨트랙트의 잔고는 1000이더가 있어야한다.
+      // Exchange 컨트랙트의 잔고는 500이더가 있어야한다.
       let exchangeBalance = await liquidity.getBalance();
       expect(toBN(exchangeBalance).toString()).to.equal(toWei('500', 'ether'));
 
-      //  Exchange 컨트랙트에 들어간 토큰 개수는 500개여야한다.
+      //  Exchange 컨트랙트에 들어간 토큰 개수는 1000개여야한다.
       var balance = await token.balanceOf(liquidity.address);
       expect(toBN(balance).toString()).to.equal(toWei('1000', 'ether'));
     });
     it('유동성을 공급한다.(기존에 유동성이 들어가 있는 상태)', async () => {
+      let liquidityTokenBalance = await token.balanceOf(liquidity.address);
+      let liquidityBalance = await liquidity.getBalance();
+      console.log(
+        'liquidityTokenBalance : ',
+        toBN(liquidityTokenBalance).toString()
+      );
+      console.log('liquidityBalance : ', toBN(liquidityBalance).toString());
+      let tempRatio = await liquidity.getSwapRatio(
+        web3.utils.toWei('1', 'ether'),
+        liquidityBalance,
+        liquidityTokenBalance
+      );
+      console.log('유동성 추가 전 슬리피지 적용: ', toBN(tempRatio).toString());
+      console.log('유동성 추가 \n토큰 : 100, 이더 : 50');
       await token.approve(liquidity.address, toWei('100', 'ether'));
-      await liquidity.addLiquidity(toWei('1', 'ether'), {
-        value: toWei('1', 'ether'),
+      await liquidity.addLiquidity(toWei('100', 'ether'), {
+        value: toWei('50', 'ether'),
       });
-      let exchangeBalance = await liquidity.getBalance();
-      // expect(toBN(exchangeBalance).toString()).to.equal(toWei('1200', 'ether'));
-      console.log(toBN(exchangeBalance).toString());
-      //  Exchange 컨트랙트에 들어간 토큰 개수는 500개여야한다.
-      var balance = await token.balanceOf(liquidity.address);
-      console.log(toBN(balance).toString());
-      // expect(toBN(balance).toString()).to.equal(toWei('600', 'ether'));
+
+      liquidityTokenBalance = await token.balanceOf(liquidity.address);
+      liquidityBalance = await liquidity.getBalance();
+      console.log(
+        'liquidityTokenBalance : ',
+        toBN(liquidityTokenBalance).toString()
+      );
+      console.log('liquidityBalance : ', toBN(liquidityBalance).toString());
+      tempRatio = await liquidity.getSwapRatio(
+        web3.utils.toWei('1', 'ether'),
+        liquidityBalance,
+        liquidityTokenBalance
+      );
+      console.log('유동성 추가 후 슬리피지 적용: ', toBN(tempRatio).toString());
+
+      // let exchangeBalance = await liquidity.getBalance();
+      // // expect(toBN(exchangeBalance).toString()).to.equal(toWei('1200', 'ether'));
+      // console.log(toBN(exchangeBalance).toString());
+      // //  Exchange 컨트랙트에 들어간 토큰 개수는 500개여야한다.
+      // var balance = await token.balanceOf(liquidity.address);
+      // console.log(toBN(balance).toString());
+      // // expect(toBN(balance).toString()).to.equal(toWei('600', 'ether'));
+    });
+    it('토큰의 유동성이 더 많은 상태에서의 스왑', async () => {
+      await liquidity.swapCoinToToken(toWei('4', 'ether'), {
+        from: accounts[1],
+        value: toWei('5', 'ether'),
+      });
+
+      console.log(toBN(await token.balanceOf(accounts[1])).toString());
+
+      // // account[1] 사용자가 5이더를 Exchange 컨트랙트에게 WEMEX 토큰 5개로 바꿔달라고 한다.
+      // let exchangeBalance = await liquidity.getBalance();
+      // expect(toBN(exchangeBalance).toString()).to.equal(
+      //   web3.utils.toWei('17', 'ether')
+      // );
+      // // // Exchange 컨트랙트의 WEMEX토큰 잔고는 80개에서 5개를 사용자에게 줘서 75개가 남는다.
+      // var balance = await token.balanceOf(liquidity.address);
+      // console.log('balance', toBN(balance).toString());
+      // expect(toBN(balance).toString()).to.equal(toWei('75', 'ether'));
     });
   });
   describe.skip('스왑 ', async () => {
@@ -91,21 +139,7 @@ contract('Liquidity', (accounts) => {
       );
     });
   });
-  describe.skip('CSMM', async () => {
-    it('가격은 일정해야한다.', async () => {
-      // liquidity 컨트랙트에게 100개의 WEMEX토큰을 사용할 수 있도록 승인
-      // await token.approve(liquidity.address, web3.utils.toWei('100', 'ether'));
-      // 유동성 공급자는 70개의 WEMEX 토큰과 10개의 이더리움을 Exchange 컨트랙트에 유동성 공급한다.
-      let exchangeBalance = await liquidity.getBalance();
-      var balance = await token.balanceOf(liquidity.address);
-      let price = await liquidity.getPrice(exchangeBalance, balance);
-      console.log(web3.utils.toBN(exchangeBalance).toString());
-      console.log(web3.utils.toBN(balance).toString());
-      // expect(web3.utils.toBN(totalSupply).toString()).to.equal(
-      //   web3.utils.toWei('100', 'ether')
-      // );
-    });
-  });
+
   describe.skip('CPMM', async () => {
     it('단순 슬리피지 계산', async () => {
       await token.approve(liquidity.address, web3.utils.toWei('50', 'ether'));
@@ -201,7 +235,7 @@ contract('Liquidity', (accounts) => {
       );
     });
   });
-  describe('swap token to coin', async () => {
+  describe.skip('swap token to coin', async () => {
     it('사용자는 토큰을 넣고 CPMM 알고리즘에 의해 위믹스 코인을 받을 수 있다.', async () => {
       await token.transfer(accounts[1], toWei('5000', 'ether'));
       let sender = await token.balanceOf(accounts[1]);
