@@ -1,21 +1,32 @@
-const Liquidity = artifacts.require('Liquidity');
+const Liquidity1 = artifacts.require('Liquidity');
+const Liquidity2 = artifacts.require('Liquidity');
 const { expect } = require('chai');
-const { ethers, providers } = require('ethers');
+const Factory = artifacts.require('Factory');
 
 const web3 = require('web3');
 const { toWei, toBN, fromWei } = web3.utils;
 const Token = artifacts.require('WEMEXToken');
-
+const TempToken = artifacts.require('TEMPToken');
 contract('Liquidity', (accounts) => {
   let token;
-  let liquidity;
+  let tempToken;
+  let liquidity1;
+  let liquidity2;
+  let factory;
+  ////////////////////////////////
   // contract() 실행 후 & 내부의 테스트 함수들이 실행되기 전에 실행되는 부분
   before(async () => {
     console.log(accounts);
     token = await Token.deployed();
     console.log('Token Contract Address:', token.address);
-    liquidity = await Liquidity.deployed();
-    console.log('exchangeInstance Address', liquidity.address);
+    liquidity1 = await Liquidity1.deployed();
+    console.log('Liquidity1 Address', liquidity1.address);
+    liquidity2 = await Liquidity2.deployed();
+    console.log('Liquidity2 Address', liquidity2.address);
+    factory = await Factory.deployed();
+    console.log('Factory Address', factory.address);
+    tempToken = await TempToken.deployed();
+    console.log('tempToken Address', tempToken.address);
   });
 
   describe.skip('Token 생성자', async () => {
@@ -32,7 +43,7 @@ contract('Liquidity', (accounts) => {
       );
     });
   });
-  describe('유동성 공급', async () => {
+  describe.skip('유동성 공급', async () => {
     it('유동성 공급한다. (유동성이 0인 상태)', async () => {
       console.log('토큰 : 1000, 이더 : 500');
       // liquidity 컨트랙트에게 1000개의 WEMEX토큰을 사용할 수 있도록 승인
@@ -139,7 +150,6 @@ contract('Liquidity', (accounts) => {
       );
     });
   });
-
   describe.skip('CPMM', async () => {
     it('단순 슬리피지 계산', async () => {
       await token.approve(liquidity.address, web3.utils.toWei('50', 'ether'));
@@ -274,6 +284,7 @@ contract('Liquidity', (accounts) => {
       await token.approve(liquidity.address, toWei('1000', 'ether'), {
         from: accounts[1],
       });
+
       await liquidity.swapTokenToCoin(
         toWei('2', 'ether'),
         toWei('1', 'ether'),
@@ -285,6 +296,54 @@ contract('Liquidity', (accounts) => {
       //   'address가 받은 Token : ',
       //   toBN(accountTokenBalance).toString()
       // );
+    });
+  });
+  describe.skip('Factory 컨트랙트에 Pool 추가', async () => {
+    it('사용자는 토큰을 넣고 CPMM 알고리즘에 의해 위믹스 코인을 받을 수 있다.', async () => {
+      // callStatic 내부적으로 View 함수 호출(가스비를쓰지 않는다)
+      const liquidity = await factory.createPool(token.address);
+      console.log(liquidity);
+      console.log(await factory.getPool(token.address));
+    });
+  });
+  describe('Swap', async () => {
+    it('사용자는 A ERC20 토큰으로 B ERC20 토큰으로 스왑할 수 있다.', async () => {
+      await factory.createPool(token.address);
+      await factory.createPool(tempToken.address);
+
+      // // approve
+      await token.approve(liquidity1.address, toWei('1000', 'ether'));
+      await tempToken.approve(liquidity2.address, toWei('1000', 'ether'));
+
+      await liquidity1.addLiquidity(toWei('500', 'ether'), {
+        value: toWei('1000', 'ether'),
+      });
+
+      await liquidity2.addLiquidity(toWei('700', 'ether'), {
+        value: toWei('1000', 'ether'),
+      });
+
+      // 실제 공급되었는지 확인
+
+      // console.log(toWei(await token.balanceOf(liquidity1.address)));
+      let liquidityTokenBalance = await token.balanceOf(liquidity1.address);
+      console.log(toBN(liquidityTokenBalance).toString());
+
+      // console.log('므야제발');
+
+      await token.transfer(accounts[1], toWei('5000', 'ether'));
+      let sender = await token.balanceOf(accounts[1]);
+      console.log('accounts[1]: ', toBN(sender).toString());
+
+      await liquidity1.tokenToTokenSwap(
+        toWei('10', 'ether'),
+        toWei('8', 'ether'),
+        toWei('8', 'ether'),
+        tempToken.address,
+        { from: accounts[1] }
+      );
+
+      // console.log(toBN(await tempToken.balanceOf(owner.address)));
     });
   });
 });
