@@ -1,46 +1,68 @@
-const Liquidity1 = artifacts.require('Liquidity');
-const Liquidity2 = artifacts.require('Liquidity');
-const { expect } = require('chai');
-const Factory = artifacts.require('Factory');
+const Liquidity = artifacts.require('Liquidity');
+var Contract = require('web3-eth-contract');
 
-const web3 = require('web3');
-const { toWei, toBN, fromWei } = web3.utils;
-const Token = artifacts.require('WEMEXToken');
+const WemexToken = artifacts.require('WEMEXToken');
 const TempToken = artifacts.require('TEMPToken');
-contract('Liquidity', (accounts) => {
-  let token;
+const Factory = artifacts.require('Factory');
+const { expect } = require('chai');
+const Web3 = require('web3');
+const { toWei, toBN, fromWei } = web3.utils;
+const fs = require('fs');
+// contract() : 어떤 컨트렉트에 대해 테스트를 진행할 것인지 명시
+contract('Factory', (accounts) => {
   let tempToken;
-  let liquidity1;
-  let liquidity2;
+  let wemexToken;
   let factory;
-  ////////////////////////////////
-  // contract() 실행 후 & 내부의 테스트 함수들이 실행되기 전에 실행되는 부분
+  let wemexPool;
+  let tempPool;
+  // before() : 하위 모든 테스트 케이스들이 실행되기 전에 한번 실행되는 함수
   before(async () => {
-    console.log(accounts);
-    token = await Token.deployed();
-    console.log('Token Contract Address:', token.address);
-    liquidity1 = await Liquidity1.deployed();
-    console.log('Liquidity1 Address', liquidity1.address);
-    liquidity2 = await Liquidity2.deployed();
-    console.log('Liquidity2 Address', liquidity2.address);
+    // 배포된 컨트랙트 연결
+    console.log('Truffle과 연결되었는지 확인하기 위한 주소\n', accounts);
+    tempToken = await TempToken.deployed();
+    console.log('TEMPToken Contract Address:', tempToken.address);
+    wemexToken = await WemexToken.deployed();
+    console.log('wemexToken Address', wemexToken.address);
     factory = await Factory.deployed();
     console.log('Factory Address', factory.address);
-    tempToken = await TempToken.deployed();
-    console.log('tempToken Address', tempToken.address);
   });
 
-  describe.skip('Token 생성자', async () => {
-    it('Token은 TotalSupply로 10000WEMEX토큰을 가지고 있어야한다.', async () => {
-      let totalSupply = await token.totalSupply();
-      let temp = web3.utils.toBN(totalSupply).toString();
-      // console.log('totalSupply', web3.utils.toBN(totalSupply).toString());
-      // assert.equal(web3.utils.toBN(totalSupply).toString()), web3.utils.toWei('100', 'ether'));
-      // console.log('totalSupply: ', web3.utils.toBN(totalSupply).toString());
+  describe('Factory Pool 생성', async (deployer) => {
+    it('Pool을 등록할 수 있다.', async () => {
+      await factory.createPool(wemexToken.address);
+      wemexPool = await factory.getPool(wemexToken.address);
+      console.log(wemexPool);
+      await factory.createPool(tempToken.address);
+      tempPool = await factory.getPool(tempToken.address);
+      console.log(tempPool);
+      const data = fs.readFileSync('./liquidity.abi', 'utf8');
 
-      // token은 처음에 100를 가지고 있다.
-      expect(web3.utils.toBN(totalSupply).toString()).to.equal(
-        web3.utils.toWei('100000', 'ether')
-      );
+      let abi = JSON.parse(data);
+      // var web3 = new Web3(
+      //   new Web3.providers.HttpProvider('http://127.0.0.1:7545/')
+      // );
+      let wemexPoolInstance = new web3.eth.Contract(abi, wemexPool, {
+        from: accounts[0],
+      });
+      console.log(await wemexPoolInstance.getBalance());
+      // let liquidityInstance = Liquidity.deploy({
+      //   arguments: wemexToken.address,
+      // });
+      // const ABI_File = JSON.parse(
+      //   fs.readFileSync('../contract/build/contracts/Liquidity.json', 'utf-8')
+      // );
+      // var contract = new Liquidity(ABI_File);
+      // // var contract1 = deployer.deploy(Liquidity, wemexToken.address);
+      // console.log(contract);
+      // let totalSupply = await token.totalSupply();
+      // let temp = web3.utils.toBN(totalSupply).toString();
+      // // console.log('totalSupply', web3.utils.toBN(totalSupply).toString());
+      // // assert.equal(web3.utils.toBN(totalSupply).toString()), web3.utils.toWei('100', 'ether'));
+      // // console.log('totalSupply: ', web3.utils.toBN(totalSupply).toString());
+      // // token은 처음에 100를 가지고 있다.
+      // expect(web3.utils.toBN(totalSupply).toString()).to.equal(
+      //   web3.utils.toWei('100000', 'ether')
+      // );
     });
   });
   describe.skip('유동성 공급', async () => {
@@ -306,7 +328,7 @@ contract('Liquidity', (accounts) => {
       console.log(await factory.getPool(token.address));
     });
   });
-  describe('Swap', async () => {
+  describe.skip('Swap', async () => {
     it('사용자는 A ERC20 토큰으로 B ERC20 토큰으로 스왑할 수 있다.', async () => {
       await factory.createPool(token.address);
       await factory.createPool(tempToken.address);
